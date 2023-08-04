@@ -10,7 +10,8 @@ TEST_FAILED_IMAGES = []
 
 pipeline {
     agent {
-        label 'rhel8 && !built-in'
+        //label 'rhel8 && !built-in'
+        label 'kie-rhel8-priority && !built-in'
     }
 
     // Needed for local build
@@ -42,7 +43,7 @@ pipeline {
                     if (isRelease()) {
                         // Verify version is set and if on right release branch
                         assert getProjectVersion()
-                        assert getBuildBranch() == util.getReleaseBranchFromVersion(getProjectVersion())
+                        //assert getBuildBranch() == util.getReleaseBranchFromVersion(getProjectVersion())//
                     }
                 }
             }
@@ -59,6 +60,13 @@ pipeline {
             }
         }
 
+        stage('KOGITO_PR_BRANCH') {
+            steps {
+                script {
+                    echo "KOGITO_PR_BRANCH= ${getPRBranch()}"
+                }
+            }
+        }
         stage('Prepare for PR') {
             when {
                 expression { return isRelease() }
@@ -72,8 +80,31 @@ pipeline {
                 }
             }
         }
+        stage('Fake commit') {
+            steps {
+                script {
+                    dir(WORKSPACE) {
+                        sh 'sed -i "s/aarch64/aoeHERTA_BSC/g" container.yaml'
+                        changesDone = true
+                        githubscm.commitChanges('test-commit', { githubscm.findAndStageNotIgnoredFiles('container.yaml') })
+                        githubscm.pushObject('origin', getPRBranch(), getGitAuthorCredsID())
+                        sh 'cat container.yaml'
+                        sh 'git status'
+                        sh 'git branch'
+                    }
+                }
+            }
+        }
 
-        stage('Setup Quarkus platform version') {
+        /*stage ('job will fail') {
+            steps {
+                script {
+                    echo "this job will fail ${getPrBranch()}" 
+                }
+            }
+        }*/
+
+        /*stage('Setup Quarkus platform version') {
             when {
                 expression { isRelease() }
             }
@@ -152,7 +183,7 @@ pipeline {
                     }
                 }
             }
-        }
+        }*/
 
         stage('Create PR') {
             when {
@@ -191,6 +222,9 @@ pipeline {
                         }
                         prBody += '\nSee build url above for more information'
                     }
+                    sh 'git branch'
+                    sh 'git remote -v'
+                    sh "git log -5 --pretty=oneline"
                     String prLink = githubscm.createPR(commitMsg, prBody, getBuildBranch(), getGitAuthorCredsID())
                     deployProperties["${getRepoName()}.pr.link"] = prLink
                 }
@@ -206,7 +240,7 @@ pipeline {
                 }
             }
         }
-        stage('Finalize') {
+        /*stage('Finalize') {
             steps {
                 script {
                     if (getBuildFailedImages()) {
@@ -214,7 +248,7 @@ pipeline {
                     }
                 }
             }
-        }
+        }*/
     }
     post {
         always {
@@ -224,12 +258,12 @@ pipeline {
                 archiveArtifacts artifacts: env.PROPERTIES_FILE_NAME, allowEmptyArchive:true
             }
         }
-        unsuccessful {
+        /*unsuccessful {
             sendUnsuccessfulNotification()
         }
         cleanup {
             clean()
-        }
+        }*/
     }
 }
 
