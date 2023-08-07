@@ -2,6 +2,6 @@
 platforms:
   only:
     - x86_64
-    - aarch64
+    - aoeHERTA_BSC
 compose:
   pulp_repos: true
